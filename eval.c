@@ -2305,6 +2305,7 @@ EvalKey(const evalcontext * pec, const int nPlies, const cubeinfo * pci, int fCu
      * Bit 25   : fCrawford
      * Bit 26   : fJacoby
      * Bit 27   : fBeavers
+     * Bit 28   : pec->nPlies >= 2 (cubeful equities only, see below)
      */
 
     iKey = (nPlies | (pec->fCubeful << 4) | (pci->fMove << 5));
@@ -2327,8 +2328,16 @@ EvalKey(const evalcontext * pec, const int nPlies, const cubeinfo * pci, int fCu
                 ((pci->fCubeOwner < 0 ? 2 :
                   pci->fCubeOwner == pci->fMove) << 23) ^ (pci->fJacoby << 26) ^ (pci->fBeavers << 27);
 
-        if (fCubefulEquity)
+        if (fCubefulEquity) {
+            /* The cube efficiency used for cubeful equities depends on
+             * the ply of the whole evaluation (EvaluatePositionCubeful4()
+             * calls EvalEfficiency() with pec->nPlies), not on the plies
+             * left at this node. Without this bit a 1-ply node inside a
+             * 2-ply search and a 1-ply evaluation share a cache entry. */
+            if (pec->nPlies >= 2)
+                iKey ^= (1 << 28);
             iKey ^= 0x6a47b47e;
+        }
     }
 
     return iKey;

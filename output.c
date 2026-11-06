@@ -54,6 +54,10 @@ int foutput_on;
 #if defined(USE_PYTHON)
 char* szMemOutput = NULL;
 int foutput_to_mem = FALSE;
+/* When set, error messages go through g_printerr() instead of straight
+ * to stderr, so that a program embedding gnubg can redirect them with
+ * g_set_printerr_handler() like the rest of the output. */
+int foutputerr_glib = FALSE;
 #endif
 
 extern void
@@ -64,20 +68,27 @@ output_initialize(void)
     foutput_on = TRUE;
 }
 
+#if defined(USE_PYTHON)
+/* Append to the buffer that collects output for the Python module.
+ * szMemOutput is NULL until the first append: it must not be passed to
+ * g_strconcat() then, as it would end the argument list. */
+static void
+output_to_mem(const char *sz, const char *szEnd)
+{
+    char *szOld = szMemOutput;
+
+    szMemOutput = g_strconcat(szOld ? szOld : "", sz, szEnd, NULL);
+    g_free(szOld);
+}
+#endif
+
 /* Write a string to stdout/status bar/popup window */
 extern void
 output(const char *sz)
 {
 #if defined(USE_PYTHON)
     if (foutput_to_mem) {
-        char *szt = g_strdup_printf("%s", sz);
-
-        if (szMemOutput)
-            szMemOutput = g_strconcat(szMemOutput, szt, NULL);
-        else
-            szMemOutput = g_strdup(szt);
-
-        g_free(szt);
+        output_to_mem(sz, "");
         return;
     }
 #endif
@@ -102,10 +113,7 @@ outputl(const char *sz)
 {
 #if defined(USE_PYTHON)
     if (foutput_to_mem) {
-        char *szt = g_strdup_printf("%s\n", sz);
-
-        szMemOutput = g_strconcat("", szMemOutput, szt, NULL);
-        g_free(szt);
+        output_to_mem(sz, "\n");
         return;
     }
 #endif
@@ -190,6 +198,15 @@ outputerrv(const char *sz, va_list val)
 #if defined(USE_GTK)
     if (fX)
         GTKOutputErr(szFormatted);
+#endif
+#if defined(USE_PYTHON)
+    if (foutputerr_glib) {
+        if (!isatty(STDOUT_FILENO))
+            fflush(stdout);
+        g_printerr("%s\n", szFormatted);
+        g_free(szFormatted);
+        return;
+    }
 #endif
     fprintf(stderr, "%s", szFormatted);
     if (!isatty(STDOUT_FILENO))
