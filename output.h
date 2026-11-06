@@ -80,6 +80,9 @@ extern int foutput_on;
 extern char* szMemOutput;
 
 extern int foutput_to_mem;
+
+/* errors through g_printerr() rather than fprintf(stderr) */
+extern int foutputerr_glib;
 #endif
 
 extern void print_utf8_to_locale(const gchar *sz);
